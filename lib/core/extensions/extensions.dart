@@ -12,3 +12,9 @@ extension TepatFit on num {
     return this * (height / TepatTokens.figmaHeight);
   }
 }
+
+extension TepatOpacity on Color {
+  Color o(double opacity) {
+    return withAlpha((opacity * 255).round());
+  }
+}
