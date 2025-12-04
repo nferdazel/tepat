@@ -3,39 +3,99 @@ import 'package:tepat/core/theme/colors.dart';
 
 enum TepatBase { blue, red }
 
-enum TepatStyle { text, outlined }
+enum TepatKind { filled, outlined }
 
-enum TepatSize { sm, md, lg, xl, x2l } // x2l == 2xl
+enum TepatSize { sm, md, lg, xl, x2l }
 
-enum TepatMode { normal, hover, focussed, disabled }
+class TepatButtonStyles {
+  static ButtonStyle style({
+    required TepatBase base,
+    required TepatKind kind,
+    required TepatSize size,
+    required bool hasIcon,
+  }) {
+    final double height = _heightFor(size);
+    final double minWidth = _minWidthFor(size, hasIcon: hasIcon);
+    final padding = const EdgeInsets.symmetric(horizontal: 20, vertical: 10);
 
-class TepatButton extends StatelessWidget {
-  final String label;
-  final VoidCallback? onPressed;
-  final TepatBase base;
-  final TepatStyle style;
-  final TepatSize size;
-  final TepatMode mode;
-  final Widget? leadingIcon; // kalau ada icon + text
-  final EdgeInsetsGeometry? paddingOverride;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(100),
+    );
 
-  const TepatButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-    this.base = TepatBase.blue,
-    this.style = TepatStyle.text,
-    this.size = TepatSize.md,
-    this.mode = TepatMode.normal,
-    this.leadingIcon,
-    this.paddingOverride,
-  });
+    final backgroundColor = WidgetStateProperty.resolveWith<Color?>((states) {
+      if (kind == TepatKind.outlined) return TepatColors.gWhite;
 
-  bool get _hasIcon => leadingIcon != null;
+      if (states.contains(WidgetState.disabled)) {
+        return base == TepatBase.blue ? TepatColors.n300 : TepatColors.rAlpha;
+      }
+      if (states.contains(WidgetState.hovered)) {
+        return base == TepatBase.blue ? TepatColors.p300 : TepatColors.r200;
+      }
+      if (states.contains(WidgetState.focused)) {
+        return base == TepatBase.blue ? TepatColors.p200 : TepatColors.r100;
+      }
+      return base == TepatBase.blue ? TepatColors.p200 : TepatColors.r100;
+    });
 
-  // Height and minWidths sesuai spec Figma
-  double get _height {
-    switch (size) {
+    final foregroundColor = WidgetStateProperty.resolveWith<Color?>((states) {
+      if (kind == TepatKind.outlined) {
+        if (states.contains(WidgetState.disabled)) return TepatColors.n300;
+        if (states.contains(WidgetState.hovered)) {
+          return base == TepatBase.blue ? TepatColors.p300 : TepatColors.r200;
+        }
+        return base == TepatBase.blue ? TepatColors.p200 : TepatColors.r100;
+      }
+
+      if (states.contains(WidgetState.disabled)) {
+        return base == TepatBase.blue ? TepatColors.gWhite : TepatColors.r300;
+      }
+      return TepatColors.gWhite;
+    });
+
+    final side = WidgetStateProperty.resolveWith<BorderSide?>((states) {
+      if (kind == TepatKind.outlined) {
+        if (states.contains(WidgetState.disabled)) {
+          return BorderSide(color: TepatColors.n300, width: 1.0);
+        }
+        if (states.contains(WidgetState.hovered)) {
+          return BorderSide(
+            color: base == TepatBase.blue ? TepatColors.p300 : TepatColors.r200,
+            width: 1.0,
+          );
+        }
+        return BorderSide(
+          color: base == TepatBase.blue ? TepatColors.p200 : TepatColors.r100,
+          width: 1.0,
+        );
+      }
+      return null;
+    });
+
+    final overlayColor = WidgetStateProperty.resolveWith<Color?>((states) {
+      if (states.contains(WidgetState.pressed)) {
+        return Colors.black.withValues(alpha: 0.06);
+      }
+      if (states.contains(WidgetState.hovered)) {
+        return Colors.black.withValues(alpha: 0.02);
+      }
+      return null;
+    });
+
+    return ButtonStyle(
+      minimumSize: WidgetStateProperty.all(Size(minWidth, height)),
+      padding: WidgetStateProperty.all(padding),
+      backgroundColor: backgroundColor,
+      foregroundColor: foregroundColor,
+      overlayColor: overlayColor,
+      side: side,
+      shape: WidgetStateProperty.all(shape),
+      elevation: WidgetStateProperty.all(0),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+
+  static double _heightFor(TepatSize s) {
+    switch (s) {
       case TepatSize.sm:
         return 36;
       case TepatSize.md:
@@ -49,245 +109,61 @@ class TepatButton extends StatelessWidget {
     }
   }
 
-  double get _minWidth {
-    // text-only -> 120 for all sizes
-    if (!_hasIcon) return 120;
-    // icon+text widths
-    switch (size) {
-      case TepatSize.sm:
-      case TepatSize.md:
-      case TepatSize.lg:
-      case TepatSize.x2l:
-        return 148;
-      case TepatSize.xl:
-        return 275;
-    }
-  }
-
-  double get _iconSize {
-    // icon size 24 for xl, else 20 (spec)
-    return size == TepatSize.xl ? 24 : 20;
-  }
-
-  // Padding spec: horizontal 20, vertical 10 (unless override)
-  EdgeInsets get _padding =>
-      paddingOverride as EdgeInsets? ??
-      const EdgeInsets.symmetric(horizontal: 20, vertical: 10);
-
-  // compute colors according to mapping in the spec
-  _ResolvedColors _resolveColors() {
-    // Default fallbacks
-    Color text = TepatColors.gWhite;
-    Color bg = Colors.transparent;
-    Color outline = Colors.transparent;
-    Color icon = TepatColors.gWhite;
-
-    if (base == TepatBase.blue) {
-      if (style == TepatStyle.text) {
-        // Blue-based text button
-        switch (mode) {
-          case TepatMode.normal:
-          case TepatMode.focussed:
-            text = TepatColors.gWhite;
-            icon = TepatColors.gWhite;
-            bg = TepatColors.p200;
-            outline = Colors.transparent;
-            break;
-          case TepatMode.hover:
-            text = TepatColors.gWhite;
-            icon = TepatColors.gWhite;
-            bg = TepatColors.p300;
-            break;
-          case TepatMode.disabled:
-            text = TepatColors.gWhite;
-            icon = TepatColors.gWhite;
-            bg = TepatColors.n300;
-            break;
-        }
-      } else {
-        // Blue-based outlined button
-        switch (mode) {
-          case TepatMode.normal:
-          case TepatMode.focussed:
-            text = TepatColors.p200;
-            icon = TepatColors.p200;
-            outline = TepatColors.p200;
-            bg = TepatColors.gWhite;
-            break;
-          case TepatMode.hover:
-            text = TepatColors.p300;
-            icon = TepatColors.p300;
-            outline = TepatColors.p300;
-            bg = TepatColors.gWhite;
-            break;
-          case TepatMode.disabled:
-            text = TepatColors.n300;
-            icon = TepatColors.n300;
-            outline = TepatColors.n300;
-            bg = TepatColors.gWhite;
-            break;
-        }
-      }
-    } else {
-      // Red base
-      if (style == TepatStyle.text) {
-        // Red-based text button
-        switch (mode) {
-          case TepatMode.normal:
-          case TepatMode.focussed:
-            text = TepatColors.gWhite;
-            icon = TepatColors.gWhite;
-            bg = TepatColors.r100;
-            break;
-          case TepatMode.hover:
-            text = TepatColors.gWhite;
-            icon = TepatColors.gWhite;
-            bg = TepatColors.r200;
-            break;
-          case TepatMode.disabled:
-            text = TepatColors.r300;
-            icon = TepatColors.r300;
-            bg = TepatColors.rAlpha;
-            break;
-        }
-        // Note: spec for disabled text of red-based textbutton said text r300 (and bg rAlpha)
-      } else {
-        // Red-based outlined
-        switch (mode) {
-          case TepatMode.normal:
-          case TepatMode.focussed:
-            text = TepatColors.r100;
-            icon = TepatColors.r100;
-            outline = TepatColors.r100;
-            bg = TepatColors.gWhite;
-            break;
-          case TepatMode.hover:
-            text = TepatColors.r200;
-            icon = TepatColors.r200;
-            outline = TepatColors.r200;
-            bg = TepatColors.gWhite;
-            break;
-          case TepatMode.disabled:
-            text = TepatColors.r300;
-            icon = TepatColors.r300;
-            outline = TepatColors.r300;
-            bg = TepatColors.gWhite;
-            break;
-        }
-      }
-    }
-
-    return _ResolvedColors(
-      textColor: text,
-      backgroundColor: bg,
-      outlineColor: outline,
-      iconColor: icon,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final resolved = _resolveColors();
-
-    // If mode disabled, ensure non-interactive
-    final effectiveOnPressed = mode == TepatMode.disabled ? null : onPressed;
-
-    final childContent = Row(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (_hasIcon) ...[
-          IconTheme(
-            data: IconThemeData(size: _iconSize, color: resolved.iconColor),
-            child: Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: SizedBox(
-                height: _iconSize,
-                width: _iconSize,
-                child: FittedBox(child: leadingIcon),
-              ),
-            ),
-          ),
-        ],
-        Flexible(
-          child: Text(
-            label,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: resolved.textColor,
-              // font styling left to designer - use default
-            ),
-          ),
-        ),
-      ],
-    );
-
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(100),
-      side: resolved.outlineColor == Colors.transparent
-          ? BorderSide.none
-          : BorderSide(color: resolved.outlineColor, width: 1.2),
-    );
-
-    final buttonChild = ConstrainedBox(
-      constraints: BoxConstraints(
-        minWidth: _minWidth,
-        minHeight: _height,
-        maxHeight: _height,
-      ),
-      child: Padding(
-        padding: EdgeInsets.zero, // padding handled inside buttons below
-        child: Center(child: childContent),
-      ),
-    );
-
-    // Choose widget type: outlined -> OutlinedButton; text -> ElevatedButton with custom bg
-    if (style == TepatStyle.outlined) {
-      return SizedBox(
-        height: _height,
-        child: OutlinedButton(
-          onPressed: effectiveOnPressed,
-          style: OutlinedButton.styleFrom(
-            backgroundColor: resolved.backgroundColor,
-            padding: _padding,
-            shape: shape,
-            minimumSize: Size(_minWidth, _height),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: buttonChild,
-        ),
-      );
-    } else {
-      // text-style but with colored bg (so using ElevatedButton with no elevation)
-      return SizedBox(
-        height: _height,
-        child: ElevatedButton(
-          onPressed: effectiveOnPressed,
-          style: ElevatedButton.styleFrom(
-            elevation: 0,
-            backgroundColor: resolved.backgroundColor,
-            shape: shape,
-            padding: _padding,
-            minimumSize: Size(_minWidth, _height),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            shadowColor: Colors.transparent,
-          ),
-          child: buttonChild,
-        ),
-      );
-    }
+  static double _minWidthFor(TepatSize s, {required bool hasIcon}) {
+    if (!hasIcon) return 120;
+    return s == TepatSize.xl ? 275 : 148;
   }
 }
 
-class _ResolvedColors {
-  final Color textColor;
-  final Color backgroundColor;
-  final Color outlineColor;
-  final Color iconColor;
-  _ResolvedColors({
-    required this.textColor,
-    required this.backgroundColor,
-    required this.outlineColor,
-    required this.iconColor,
+class TepatButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final TepatBase base;
+  final TepatKind kind;
+  final TepatSize size;
+  final Widget? leadingIcon;
+
+  const TepatButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.base = TepatBase.blue,
+    this.kind = TepatKind.filled,
+    this.size = TepatSize.md,
+    this.leadingIcon,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasIcon = leadingIcon != null;
+    final style = TepatButtonStyles.style(
+      base: base,
+      kind: kind,
+      size: size,
+      hasIcon: hasIcon,
+    );
+
+    final iconSize = size == TepatSize.xl ? 24.0 : 20.0;
+
+    final child = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (hasIcon)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconTheme(
+              data: IconThemeData(size: iconSize),
+              child: leadingIcon!,
+            ),
+          ),
+        Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+      ],
+    );
+
+    if (kind == TepatKind.outlined) {
+      return OutlinedButton(onPressed: onPressed, style: style, child: child);
+    } else {
+      return ElevatedButton(onPressed: onPressed, style: style, child: child);
+    }
+  }
 }
